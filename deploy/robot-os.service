@@ -1,0 +1,15 @@
+[Unit]
+Description=Robot OS
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/pi/robot_os
+ExecStart=/home/pi/robot_os/.venv/bin/python /home/pi/robot_os/main.py --no-interactive
+Restart=on-failure
+RestartSec=2
+User=pi
+Group=pi
+
+[Install]
+WantedBy=multi-user.target
