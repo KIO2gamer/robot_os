@@ -264,7 +264,7 @@ python main.py  # With RUN_DEMO=True
 
 ```bash
 sudo apt update
-sudo apt install -y python3-venv python3-pip sqlite3
+sudo apt install -y python3-venv python3-pip sqlite3 python3-tk
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -277,10 +277,20 @@ source .venv/bin/activate
 python main.py --mode manual
 ```
 
+### Run in a virtual machine
+
+Use simulation mode to avoid GPIO hardware access while still opening the touchscreen interface:
+
+```bash
+python main.py --simulate --ui touchscreen
+```
+
 Useful startup flags:
 
+- `--simulate` uses mock motors instead of GPIO hardware.
 - `--vision` enables the vision layer in simulation mode.
 - `--demo` runs the demo sequence before normal startup.
+- `--ui cli|touchscreen` chooses the interface to show.
 - `--no-interactive` runs headless for service mode.
 - `--mode manual|autonomous|demo` sets the initial operating mode.
 

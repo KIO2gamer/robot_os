@@ -4,9 +4,29 @@ Motion Service - Locomotion control for Robot OS.
 Handles all motor control and movement operations.
 """
 
-from gpiozero import Motor
 from time import sleep
 from config import logger, GPIO_CONFIG
+
+try:
+    from gpiozero import Motor
+except ImportError:
+    Motor = None
+
+
+class MockMotor:
+    """Fallback motor backend used for virtual machine simulation."""
+
+    def __init__(self, name):
+        self.name = name
+
+    def forward(self, speed=0.0):
+        logger.info("[SIM] %s forward at %s", self.name, speed)
+
+    def backward(self, speed=0.0):
+        logger.info("[SIM] %s backward at %s", self.name, speed)
+
+    def stop(self):
+        logger.info("[SIM] %s stop", self.name)
 
 class RobotChassis:
     """
@@ -14,9 +34,18 @@ class RobotChassis:
     Manages left and right motor control for movement and steering.
     """
     
-    def __init__(self):
+    def __init__(self, simulation=False):
         """Initialize the robot chassis with configured GPIO pins."""
         try:
+            self.simulation = simulation or Motor is None
+
+            if self.simulation:
+                self.left_motors = MockMotor("left_motor")
+                self.right_motors = MockMotor("right_motor")
+                logger.info("Robot Chassis initialized in simulation mode")
+                print("Simulation: Robot Chassis Initialized.")
+                return
+
             # Initialize Left Motors using configured pins
             left_config = GPIO_CONFIG["LEFT_MOTOR"]
             self.left_motors = Motor(
@@ -24,7 +53,7 @@ class RobotChassis:
                 backward=left_config["backward"],
                 enable=left_config["enable"]
             )
-            
+
             # Initialize Right Motors using configured pins
             right_config = GPIO_CONFIG["RIGHT_MOTOR"]
             self.right_motors = Motor(
@@ -32,7 +61,7 @@ class RobotChassis:
                 backward=right_config["backward"],
                 enable=right_config["enable"]
             )
-            
+
             logger.info("✓ Robot Chassis initialized successfully")
             print("Hardware: Robot Chassis Initialized.")
         

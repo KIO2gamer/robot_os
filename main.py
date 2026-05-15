@@ -24,6 +24,11 @@ def parse_arguments():
         help="Enable the vision subsystem",
     )
     parser.add_argument(
+        "--simulate",
+        action="store_true",
+        help="Run without GPIO hardware using simulated motors",
+    )
+    parser.add_argument(
         "--demo",
         action="store_true",
         help="Run the demo scenario before starting",
@@ -39,15 +44,22 @@ def parse_arguments():
         default="manual",
         help="Set the operating mode",
     )
+    parser.add_argument(
+        "--ui",
+        choices=["cli", "touchscreen"],
+        default="touchscreen",
+        help="Choose the interface to show",
+    )
     return parser.parse_args()
 
 
-def initialize_subsystems(enable_vision=False):
+def initialize_subsystems(enable_vision=False, simulate=False):
     """
     Initialize all robot subsystems.
     
     Args:
         enable_vision: Whether to enable the vision system
+        simulate: Whether to use simulated motion hardware
     
     Returns:
         Tuple of (motion_service, inventory_service, vision_service)
@@ -56,7 +68,7 @@ def initialize_subsystems(enable_vision=False):
     
     try:
         # Initialize hardware services
-        motion_service = RobotChassis()
+        motion_service = RobotChassis(simulation=simulate)
         logger.info("✓ Motion service initialized")
         
         # Initialize database service
@@ -126,7 +138,7 @@ def demo_scenario(controller):
         controller.emergency_stop()
 
 
-def main(enable_vision=False, run_demo=False, interactive=True, mode="manual"):
+def main(enable_vision=False, run_demo=False, interactive=True, mode="manual", simulate=False, ui="touchscreen"):
     """
     Main entry point for Robot OS.
     
@@ -135,6 +147,8 @@ def main(enable_vision=False, run_demo=False, interactive=True, mode="manual"):
         run_demo: Whether to run a demo scenario before interactive mode
         interactive: Whether to start interactive CLI session
         mode: Initial operating mode
+        simulate: Whether to use simulated motion hardware
+        ui: Interface mode to use
     """
     logger.info("="*60)
     logger.info("Robot OS Starting")
@@ -143,6 +157,7 @@ def main(enable_vision=False, run_demo=False, interactive=True, mode="manual"):
     # Initialize subsystems
     motion_service, inventory_service, vision_service = initialize_subsystems(
         enable_vision=enable_vision
+        , simulate=simulate
     )
     
     # Create the application controller
@@ -154,10 +169,13 @@ def main(enable_vision=False, run_demo=False, interactive=True, mode="manual"):
         if run_demo:
             demo_scenario(controller)
         
-        # Start interactive session if requested
+        # Start the requested interface
         if interactive:
-            ui = UIEngine(controller)
-            ui.run_interactive_session()
+            interface = UIEngine(controller)
+            if ui == "touchscreen":
+                interface.run_touchscreen_session()
+            else:
+                interface.run_interactive_session()
         else:
             # Just keep the system running
             controller.start()
@@ -187,4 +205,6 @@ if __name__ == "__main__":
         run_demo=args.demo,
         interactive=not args.no_interactive,
         mode=args.mode,
+        simulate=args.simulate,
+        ui=args.ui,
     )

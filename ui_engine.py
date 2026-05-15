@@ -6,6 +6,8 @@ Currently implements a CLI interface; can be extended for touchscreen or web UI.
 """
 
 import logging
+import tkinter as tk
+from tkinter import ttk
 from config import logger
 
 class UIEngine:
@@ -251,3 +253,99 @@ class UIEngine:
         except KeyboardInterrupt:
             print("\n\n[SYSTEM] Keyboard interrupt detected. Emergency stop!")
             self.controller.emergency_stop()
+
+    # ============ TOUCHSCREEN UI ============
+
+    def run_touchscreen_session(self):
+        """Run a touchscreen-style Tkinter interface."""
+        root = tk.Tk()
+        root.title("Robot OS Touchscreen")
+        root.geometry("900x600")
+        root.minsize(800, 500)
+
+        root.columnconfigure(0, weight=1)
+        root.rowconfigure(1, weight=1)
+
+        header = ttk.Frame(root, padding=16)
+        header.grid(row=0, column=0, sticky="ew")
+        header.columnconfigure(0, weight=1)
+
+        title = ttk.Label(header, text="Robot OS", font=("Arial", 24, "bold"))
+        title.grid(row=0, column=0, sticky="w")
+
+        subtitle = ttk.Label(header, text="Touchscreen simulation mode" if getattr(self.controller.motion, "simulation", False) else "Touchscreen control panel")
+        subtitle.grid(row=1, column=0, sticky="w", pady=(4, 0))
+
+        body = ttk.Frame(root, padding=16)
+        body.grid(row=1, column=0, sticky="nsew")
+        body.columnconfigure(0, weight=1)
+        body.columnconfigure(1, weight=1)
+        body.rowconfigure(0, weight=1)
+
+        motion_frame = ttk.LabelFrame(body, text="Motion Control", padding=12)
+        motion_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+        motion_frame.columnconfigure(0, weight=1)
+        motion_frame.columnconfigure(1, weight=1)
+        motion_frame.columnconfigure(2, weight=1)
+
+        inventory_frame = ttk.LabelFrame(body, text="Inventory", padding=12)
+        inventory_frame.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
+        inventory_frame.columnconfigure(0, weight=1)
+        inventory_frame.rowconfigure(1, weight=1)
+
+        status_frame = ttk.LabelFrame(root, text="Status", padding=12)
+        status_frame.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 16))
+        status_frame.columnconfigure(0, weight=1)
+
+        status_var = tk.StringVar(value="Ready")
+        inventory_text = tk.StringVar(value="")
+
+        def refresh_inventory():
+            items = self.controller.get_inventory()
+            lines = ["Item | Price | Stock", "-" * 24]
+            for item_name, price, stock in items:
+                lines.append(f"{item_name} | ${price:.2f} | {stock}")
+            inventory_text.set("\n".join(lines) if len(lines) > 2 else "No items in stock")
+
+        def set_status(message):
+            status_var.set(message)
+
+        def run_action(message, action):
+            try:
+                action()
+                set_status(message)
+                refresh_inventory()
+            except Exception as exc:
+                set_status(f"Error: {exc}")
+
+        ttk.Button(motion_frame, text="Forward", command=lambda: run_action("Moving forward", lambda: self.controller.move_forward())).grid(row=0, column=1, sticky="ew", padx=6, pady=6)
+        ttk.Button(motion_frame, text="Left", command=lambda: run_action("Turning left", lambda: self.controller.turn_left())).grid(row=1, column=0, sticky="ew", padx=6, pady=6)
+        ttk.Button(motion_frame, text="Stop", command=lambda: run_action("Stopped", self.controller.emergency_stop)).grid(row=1, column=1, sticky="ew", padx=6, pady=6)
+        ttk.Button(motion_frame, text="Right", command=lambda: run_action("Turning right", lambda: self.controller.turn_right())).grid(row=1, column=2, sticky="ew", padx=6, pady=6)
+        ttk.Button(motion_frame, text="Backward", command=lambda: run_action("Moving backward", lambda: self.controller.move_backward())).grid(row=2, column=1, sticky="ew", padx=6, pady=6)
+
+        inventory_view = tk.Text(inventory_frame, height=18, wrap="word")
+        inventory_view.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+        inventory_view.configure(state="disabled")
+
+        def update_inventory_widget():
+            refresh_inventory()
+            inventory_view.configure(state="normal")
+            inventory_view.delete("1.0", tk.END)
+            inventory_view.insert(tk.END, inventory_text.get())
+            inventory_view.configure(state="disabled")
+
+        ttk.Button(inventory_frame, text="Refresh Inventory", command=update_inventory_widget).grid(row=0, column=0, sticky="ew")
+
+        status_label = ttk.Label(status_frame, textvariable=status_var)
+        status_label.grid(row=0, column=0, sticky="w")
+
+        def on_close():
+            self.controller.stop()
+            root.destroy()
+
+        root.protocol("WM_DELETE_WINDOW", on_close)
+
+        self.controller.start()
+        update_inventory_widget()
+        root.mainloop()
